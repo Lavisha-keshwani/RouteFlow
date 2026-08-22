@@ -1,0 +1,32 @@
+# Render Blueprint — one-click backend deploy.
+# Docs: https://render.com/docs/blueprint-spec
+# In Render: New + → Blueprint → connect this repo. Set DATABASE_URL and CORS_ORIGINS
+# (JWT_SECRET is auto-generated). Free plan spins down when idle (first request is slow).
+services:
+  - type: web
+    name: routeflow-api
+    runtime: python
+    plan: free
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    # Migrations + idempotent seed run on boot; seed self-skips once data exists.
+    startCommand: alembic upgrade head && python -m app.seeds.seed && uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.7
+      - key: ENVIRONMENT
+        value: production
+      - key: DEBUG
+        value: "false"
+      - key: JWT_SECRET
+        generateValue: true          # Render generates a strong secret
+      - key: DATABASE_URL
+        sync: false                   # paste your Neon connection string
+      - key: CORS_ORIGINS
+        sync: false                   # set to your Vercel URL, e.g. https://routeflow.vercel.app
+      - key: EMAIL_PROVIDER
+        value: console
+      - key: SMS_ENABLED
+        value: "false"

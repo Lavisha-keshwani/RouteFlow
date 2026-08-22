@@ -1,0 +1,56 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: routeflow-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-routeflow}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-routeflow}
+      POSTGRES_DB: ${POSTGRES_DB:-routeflow}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-routeflow} -d ${POSTGRES_DB:-routeflow}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build: ./backend
+    container_name: routeflow-backend
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg2://routeflow:routeflow@postgres:5432/routeflow}
+      JWT_SECRET: ${JWT_SECRET:-dev-secret-change-me}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5173}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173}
+      EMAIL_ENABLED: ${EMAIL_ENABLED:-true}
+      EMAIL_PROVIDER: ${EMAIL_PROVIDER:-console}
+      SMS_ENABLED: ${SMS_ENABLED:-false}
+      SEED_ON_START: ${SEED_ON_START:-true}
+      WEB_CONCURRENCY: "2"
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8000/api}
+    container_name: routeflow-frontend
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+
+volumes:
+  pgdata:
